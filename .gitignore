@@ -1,0 +1,21 @@
+# IntelliJ
+.idea
+
+# Virtual Environment
+venv/
+.env
+
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# macOS
+.DS_Store
+
+# VSCode
+.vscode/
+
+# Text backup files
+*.bak

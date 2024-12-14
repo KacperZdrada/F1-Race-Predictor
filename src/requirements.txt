@@ -1,0 +1,4 @@
+# Library for sending HTTP Requests
+requests==2.32.3
+# Library for parsing HTML content
+beautifulsoup4==4.12.3
