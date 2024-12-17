@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 
 # Helper function to get beautiful soup object from URL
 def getPageObject(url):
+    print("Scraping:", url)
     # HTTP request to get URL
     page = requests.get(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
@@ -29,6 +30,16 @@ def getRaces(mainPage, year):
         raceDict[races.text.strip()] = "https://www.formula1.com/en/results/"+str(year)+"/"+races.get("href")
     return raceDict
 
+# Helper function that returns list of parameters needed by the getResults function for qualifying depending on year
+# This is because results are structured differently on the website for these years
+# List of structure [url-ending, startEntriesSkipped, usefulColumns, columnsSkipped]
+def getQualiScrapingParameters(year):
+    if year >= 1950 and year <= 1982:
+        return ["starting-grid", 5, 4, 0]
+    elif year >= 1983 and year<=2005:
+        return ["qualifying/0", 6, 4, 1]
+    else:
+        return ["qualifying", 8, 4, 5]
 
 # Helper function to get list of results
 
@@ -43,22 +54,14 @@ def getRaces(mainPage, year):
 # Scraped race table is structured as follows:
 #    0     |     1      |    2   |   3  |  4   |  5   |   6
 # Position | Car Number | Driver | Team | Laps | Time | Points
-def getResults(url, startEntriesSkipped = 7, usefulColumns = 4, columnsSkipped = 4, qualifying = False):
-    if qualifying:
-        # Change the URL from the race result page to the qualifying result page
-        url = url.replace("race-result", "qualifying")
-        # Need to skip 8 headers, and 4 columns in the case of the qualifying results table
-        startEntriesSkipped = 8
-        columnsSkipped = 5
-
+def getResults(url, parameters):
     qualifyingPage = getPageObject(url)
     # Find all p elements in the results table
     qualifyingResults = qualifyingPage.find("table", class_="f1-table f1-table-with-data w-full").find_all('p')
 
     # Loop through all the p elements taking only data that is needed
-
     data = []
-    counter = startEntriesSkipped  # Initialise counter to skip headers
+    counter = parameters[1]  # Initialise counter to skip headers
     counter2 = 0  # Second counter used to keep track of when columns need to be skipped
     while counter < len(qualifyingResults):
         entry = qualifyingResults[counter].text.replace("\xa0", " ")
@@ -70,23 +73,42 @@ def getResults(url, startEntriesSkipped = 7, usefulColumns = 4, columnsSkipped =
         data.append(entry)
 
         counter2 += 1
-        if counter2 == usefulColumns:
+        if counter2 == parameters[2]:
             counter2 = 0
-            counter += columnsSkipped  # Skip unnecessary columns
+            counter += parameters[3]  # Skip unnecessary columns
         else:
             counter += 1
     return data
 
 
+# Helper function to take list of structure
+#  i%4==0  |   i%4==1   | i%4==2 | i%4==3      (where i is the index)
+# Position | Car Number | Driver | Team
+# And write it to a .csv file with following structure
+#  Race, Year, Position, Car Number, Driver, Team
+def writeResults(filename, data, race, year):
+    file = open(filename, "a")
+    for row in range(0, int(len(data)/4)):
+        # Concatenate where the race took place and the year
+        entry = str(race)+","+str(year)
+        # Concatenate each position, car number, driver, team
+        for subentry in range(0,4):
+            entry = entry+","+str(data[(row*4)+subentry])
+        # Start new row
+        file.write(entry+"\n")
+
+
 def main():
     try:
-        races2024 = getRaces(getPageObject("https://www.formula1.com/en/results/2024/races"), 2024)
-        for race in races2024:
-            qualiResults = getResults(races2024[race], qualifying=True)
-            raceResults = getResults(races2024[race])
-            print(race)
-            print(qualiResults)
-            print(raceResults)
+        for year in range(2006, 2025):
+            races = getRaces(getPageObject("https://www.formula1.com/en/results/"+str(year)+"/races"), year)
+            for race in races:
+                time.sleep(1)
+                qualiResults = getResults(races[race].replace("race-result","qualifying"), getQualiScrapingParameters(year))
+                time.sleep(1)
+                raceResults = getResults(races[race], ["", 7, 4, 4])
+                writeResults("qualiResults.csv", qualiResults, race, year)
+                writeResults("raceResults.csv", raceResults, race, year)
 
     except Exception as e:
         print(e)
