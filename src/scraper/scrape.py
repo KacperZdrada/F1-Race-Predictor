@@ -101,7 +101,7 @@ def scrapeFilePrep(filename, headers):
 def main():
     try:
         scrapeFilePrep("qualiResults.csv", "Race,Year,Position,Car Number,Driver,Team,Q1,Q2,Q3,Laps")
-        scrapeFilePrep("raceResults.csv", "Race,Year,Position,Car Number,Driver,Team,Points")
+        scrapeFilePrep("raceResults.csv", "Race,Year,Position,Car Number,Driver,Team,Laps,Time,Points")
         for year in range(2006, 2025):
             races = getRaces(getPageObject("https://www.formula1.com/en/results/"+str(year)+"/races"), year)
             for race in races:

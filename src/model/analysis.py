@@ -17,16 +17,43 @@ def dataProcessing():
     # Now drop unnecessary Q1 and Q2 columns
     mergedResults = mergedResults.drop(["Q1", "Q2"], axis=1)
 
-    # Replace every NC (Not Classfied) and DQ (disqualified) position with 26
-    mergedResults["Position Race"] = mergedResults["Position Race"].replace("NC", 26).replace("DQ", 26)
-    mergedResults["Position Quali"] = mergedResults["Position Quali"].replace("NC", 26).replace("DQ", 26)
+    # Replace every NC (Not Classfied), DQ (disqualified), RT (Retired), EX (Excluded) position with 26 (lower than any
+    # possible position
+    mergedResults["Position Race"] = (mergedResults["Position Race"]
+                                      .replace("NC", 26)
+                                      .replace("DQ", 26)
+                                      .replace("RT", 26)
+                                      .replace("EX", 26)
+                                      .astype(int))
+    mergedResults["Position Quali"] = (mergedResults["Position Quali"]
+                                       .replace("NC", 26)
+                                       .replace("DQ", 26)
+                                       .replace("RT", 26)
+                                       .replace("EX", 26)
+                                       .astype(int))
 
+    # Add binary column for win or no win
+    mergedResults["Win"] = mergedResults["Position Race"].apply(lambda x: 1 if x == 1 else 0)
+
+    # Add binary column for race DNF and cumulative team DNFs for a season (up to previous race)
+    mergedResults["Race DNF"] = mergedResults["Time"].apply(lambda x: 1 if x == "DNF" else 0)
+
+    # FOLLOWING CODE BROKEN ATM (need to figure out sorting)
+    #mergedResults = mergedResults.sort_values(by=['Year', 'Team', 'Race'])
+    mergedResults["Team Season DNF"] = (mergedResults.groupby(["Year", "Team"])["Race DNF"]
+                                        .cumsum()
+                                        .shift(1, fill_value=0))
+    mergedResults["Season Points"] = (mergedResults.groupby(["Year", "Driver"])["Points"]
+                                      .cumsum()
+                                      .shift(1, fill_value=0))
+    mergedResults = mergedResults.reset_index().sort_values(by="index")
+    
     # Replace DNF (Did Not Finish) and DNS (Did Not Start) Q3 times
     # Need to encode categorical data like driver names, team names, and race location
 
     print(qualificationResults.head())
-    print(raceResults.head())
-    print(mergedResults.head())
+    print(raceResults.head(25))
+    print(mergedResults.head(50))
 
 
 def main():
