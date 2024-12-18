@@ -35,18 +35,13 @@ def getRaces(mainPage, year):
 # List of structure [url-ending, startEntriesSkipped, usefulColumns, columnsSkipped]
 def getQualiScrapingParameters(year):
     if year >= 1950 and year <= 1982:
-        return ["starting-grid", 5, 4, 0]
+        return ["starting-grid", 5]
     elif year >= 1983 and year<=2005:
-        return ["qualifying/0", 6, 4, 1]
+        return ["qualifying/0", 6]
     else:
-        return ["qualifying", 8, 4, 5]
+        return ["qualifying", 8, "Race,Year,Position,Car Number,Driver,Team,Q1,Q2,Q3,Laps"]
 
 # Helper function to get list of results
-
-# List structured as follows:
-#  i%4==0  |   i%4==1   | i%4==2 | i%4==3      (where i is the index)
-# Position | Car Number | Driver | Team
-
 # Scraped qualifying table is structured as follows:
 #    0     |     1      |    2   |   3  |  4 |  5 |  6 |  7
 # Position | Car Number | Driver | Team | Q1 | Q2 | Q3 | laps
@@ -66,18 +61,13 @@ def getResults(url, parameters):
     while counter < len(qualifyingResults):
         entry = qualifyingResults[counter].text.replace("\xa0", " ")
 
-        if counter2 == 2:
+        if counter % parameters[1] == 2:
             # Remove driver code from name
             entry = entry[:-3]
 
         data.append(entry)
 
-        counter2 += 1
-        if counter2 == parameters[2]:
-            counter2 = 0
-            counter += parameters[3]  # Skip unnecessary columns
-        else:
-            counter += 1
+        counter += 1
     return data
 
 
@@ -86,31 +76,44 @@ def getResults(url, parameters):
 # Position | Car Number | Driver | Team
 # And write it to a .csv file with following structure
 #  Race, Year, Position, Car Number, Driver, Team
-def writeResults(filename, data, race, year):
+def writeResults(filename, data, race, year, parameters):
+    # Append data to csv file
     file = open(filename, "a")
-    for row in range(0, int(len(data)/4)):
+
+    for row in range(0, int(len(data)/parameters[1])):
         # Concatenate where the race took place and the year
         entry = str(race)+","+str(year)
         # Concatenate each position, car number, driver, team
-        for subentry in range(0,4):
-            entry = entry+","+str(data[(row*4)+subentry])
+        for subentry in range(0, parameters[1]):
+            entry = entry+","+str(data[(row*parameters[1])+subentry])
         # Start new row
         file.write(entry+"\n")
+    file.close()
+
+
+# Helper function that adds headers to the files containing scraped data
+def scrapeFilePrep(filename, headers):
+    file = open(filename, "w")
+    file.write(headers+'\n')
+    file.close()
 
 
 def main():
     try:
+        scrapeFilePrep("qualiResults.csv", "Race,Year,Position,Car Number,Driver,Team,Q1,Q2,Q3,Laps")
+        scrapeFilePrep("raceResults.csv", "Race,Year,Position,Car Number,Driver,Team,Points")
         for year in range(2006, 2025):
             races = getRaces(getPageObject("https://www.formula1.com/en/results/"+str(year)+"/races"), year)
             for race in races:
                 time.sleep(1)
                 qualiResults = getResults(races[race].replace("race-result","qualifying"), getQualiScrapingParameters(year))
                 time.sleep(1)
-                raceResults = getResults(races[race], ["", 7, 4, 4])
-                writeResults("qualiResults.csv", qualiResults, race, year)
-                writeResults("raceResults.csv", raceResults, race, year)
+                raceResults = getResults(races[race], ["", 7])
+                writeResults("qualiResults.csv", qualiResults, race, year, ["", 8])
+                writeResults("raceResults.csv", raceResults, race, year, ["", 7])
 
     except Exception as e:
         print(e)
+
 
 main()

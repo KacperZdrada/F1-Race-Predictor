@@ -19,3 +19,6 @@ __pycache__/
 
 # Text backup files
 *.bak
+
+# Scraped data
+*.csv
