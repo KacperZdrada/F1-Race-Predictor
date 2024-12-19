@@ -36,23 +36,35 @@ def dataProcessing():
     mergedResults["Win"] = mergedResults["Position Race"].apply(lambda x: 1 if x == 1 else 0)
 
     # Add binary column for race DNF and cumulative team DNFs for a season (up to previous race)
-    mergedResults["Race DNF"] = mergedResults["Time"].apply(lambda x: 1 if x == "DNF" else 0)
+    mergedResults["Race DNF"] = mergedResults["Time"].apply(lambda x: 1 if (x == "DNF" or x == "DNS") else 0)
 
-    # FOLLOWING CODE BROKEN ATM (need to figure out sorting)
-    #mergedResults = mergedResults.sort_values(by=['Year', 'Team', 'Race'])
-    mergedResults["Team Season DNF"] = (mergedResults.groupby(["Year", "Team"])["Race DNF"]
-                                        .cumsum()
-                                        .shift(1, fill_value=0))
+    # Add column for race number
+    mergedResults["Race Number"] = mergedResults.groupby(["Year", "Race"], sort=False).ngroup() + 1
+
+    # Create a new dataframe to store the total amount of DNFs for each team per race
+    teamDNFs = mergedResults.groupby(["Year", "Race Number", "Team"]).agg({"Race DNF": "sum"})
+
+    # Add a new column that tracks the cumulative DNFs for each team through the season (excluding current race)
+    teamDNFs["Team Season DNF"] = teamDNFs.groupby(["Year", "Team"])["Race DNF"].cumsum() - teamDNFs["Race DNF"]
+    teamDNFs = teamDNFs.drop("Race DNF", axis=1)
+    # Merge this data with existing dataframe
+    mergedResults = mergedResults.merge(teamDNFs, on=["Race Number", "Team"])
+
+    # Add column for cumulative number of driver points excluding the current race
     mergedResults["Season Points"] = (mergedResults.groupby(["Year", "Driver"])["Points"]
-                                      .cumsum()
-                                      .shift(1, fill_value=0))
-    mergedResults = mergedResults.reset_index().sort_values(by="index")
-    
+                                      .cumsum() - mergedResults["Points"])
+
+    # Create a new dataframe to store the average position for each driver for past 5 races
+
+    # Some qualification time delta feature
     # Replace DNF (Did Not Finish) and DNS (Did Not Start) Q3 times
+    # Drop unnecessary columns
+    # Normalise data
     # Need to encode categorical data like driver names, team names, and race location
 
     print(qualificationResults.head())
     print(raceResults.head(25))
+    print(teamDNFs.head(50))
     print(mergedResults.head(50))
 
 
