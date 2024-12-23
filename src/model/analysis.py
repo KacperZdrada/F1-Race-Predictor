@@ -55,6 +55,22 @@ def dataProcessing():
                                       .cumsum() - mergedResults["Points"])
 
     # Create a new dataframe to store the average position for each driver for past 5 races
+    last5 = mergedResults[["Year", "Race Number", "Driver", "Position Race"]].copy()
+    last5 = last5.sort_values(by=["Driver", "Year", "Race Number"])
+
+    # Create new column to hold the average
+    last5["Last 5 Race"] = (last5.groupby("Driver")["Position Race"]
+                            # Create rolling window of size 6 excluding current row (so window of size 5)
+                            .rolling(window=6, min_periods=1, closed="left")
+                            .mean()
+                            # Fill the first entry with 0 (as no mean here because row is excluded)
+                            .fillna(0)
+                            .reset_index(level=0, drop=True))
+
+    # Drop unnecessary columns
+    last5 = last5.drop(["Position Race", "Year"], axis=1)
+
+    mergedResults = mergedResults.merge(last5, on=["Driver", "Race Number"])
 
     # Some qualification time delta feature
     # Replace DNF (Did Not Finish) and DNS (Did Not Start) Q3 times
@@ -65,6 +81,7 @@ def dataProcessing():
     print(qualificationResults.head())
     print(raceResults.head(25))
     print(teamDNFs.head(50))
+    print(last5.head(50))
     print(mergedResults.head(50))
 
 
