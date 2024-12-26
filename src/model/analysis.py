@@ -14,8 +14,6 @@ def dataProcessing():
     mergedResults["Q2"] = mergedResults["Q2"].fillna(mergedResults["Q1"])
     # Fill Null Q3 results with Q2 times
     mergedResults["Q3"] = mergedResults["Q3"].fillna(mergedResults["Q2"])
-    # Now drop unnecessary Q1 and Q2 columns
-    mergedResults = mergedResults.drop(["Q1", "Q2"], axis=1)
 
     # Replace every NC (Not Classfied), DQ (disqualified), RT (Retired), EX (Excluded) position with 26 (lower than any
     # possible position
@@ -72,9 +70,34 @@ def dataProcessing():
 
     mergedResults = mergedResults.merge(last5, on=["Driver", "Race Number"])
 
-    # Some qualification time delta feature
-    # Replace DNF (Did Not Finish) and DNS (Did Not Start) Q3 times
+    # Loop over Q1, Q2, and Q3
+    for i in range(1,4):
+
+        # Replace DNF (Did Not Finish) and DNS (Did Not Start) times and any other null values
+        mergedResults["Q"+str(i)] = (mergedResults["Q"+str(i)]
+                               .replace("DNF", "99999:99.999")
+                               .replace("DNS", "99999:99.999")
+                               .replace("DEL", "99999:99.999")
+                               .fillna("99999:99.999")
+                               )
+
+        # Convert all string times into float datatype
+        mergedResults["Q"+str(i)] = mergedResults["Q"+str(i)].apply(lambda x: stringTimetoInt(x))
+
+    # Find the single fastest individual time across all three qualifying sessions for each driver
+    mergedResults["Fastest Individual Time"] = mergedResults[["Q1", "Q2", "Q3"]].min(axis=1)
+
+    # Find the single fastest individual time across all three qualifying sessions and all drivers
+    mergedResults["Fastest Quali Time"] = (mergedResults.groupby(["Year", "Race Number"])["Fastest Individual Time"]
+                                           .transform("min"))
+
+    # Create a new column that has the delta between each driver's fastest qualifying time and the overall
+    # qualification fastest time
+    mergedResults["Quali Delta"] = mergedResults["Fastest Individual Time"] - mergedResults["Fastest Quali Time"]
+
     # Drop unnecessary columns
+    mergedResults = mergedResults.drop(["Q1", "Q2"], axis=1)
+
     # Normalise data
     # Need to encode categorical data like driver names, team names, and race location
 
@@ -84,6 +107,20 @@ def dataProcessing():
     print(last5.head(50))
     print(mergedResults.head(50))
 
+
+# Helper function to convert qualifying time from "minute:second.millisecond" format into total seconds
+def stringTimetoInt(time):
+    try:
+        minutes, rest = time.split(':')
+    except ValueError:
+        # If a value error has occurred, then the issue is that .split() returned one argument instead of two
+        # This only happens when the input time is of the form "second.milliseconds" if the time was below a minute
+        # Hence, set minutes to 0, and the rest of the string, which is of the form "second.milliseconds" as the original
+        # input string
+        minutes = 0
+        rest = time
+    seconds, milliseconds = rest.split('.')
+    return (int(minutes) * 60) + int(seconds) + (int(milliseconds)/1000)
 
 def main():
     dataProcessing()
