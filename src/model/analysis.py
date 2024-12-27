@@ -1,5 +1,5 @@
 import pandas as pd
-
+from sklearn.preprocessing import StandardScaler
 
 def dataProcessing():
     # Read both results files and transform into pandas dataframe
@@ -96,16 +96,24 @@ def dataProcessing():
     mergedResults["Quali Delta"] = mergedResults["Fastest Individual Time"] - mergedResults["Fastest Quali Time"]
 
     # Drop unnecessary columns
-    mergedResults = mergedResults.drop(["Q1", "Q2"], axis=1)
+    mergedResults = mergedResults.drop(["Q1", "Q2", "Time", "Laps Quali", "Laps Race"], axis=1)
+
+    # Change team names to standard (ignoring engines, sponsors, etc. in names)
+    mergedResults["Team"] = mergedResults["Team"].apply(lambda team: updateTeamNames(team))
 
     # Normalise data
-    # Need to encode categorical data like driver names, team names, and race location
+    scaler = StandardScaler()
+    mergedResults[["Quali Delta"]] = scaler.fit_transform(mergedResults[["Quali Delta"]])
+
+    # One-hot encode categorical data like driver names, team names, and race location
+    mergedResults = pd.get_dummies(mergedResults, columns=["Driver", "Team", "Race"], drop_first=True)
 
     print(qualificationResults.head())
     print(raceResults.head(25))
     print(teamDNFs.head(50))
     print(last5.head(50))
     print(mergedResults.head(50))
+    return mergedResults
 
 
 # Helper function to convert qualifying time from "minute:second.millisecond" format into total seconds
@@ -122,9 +130,66 @@ def stringTimetoInt(time):
     seconds, milliseconds = rest.split('.')
     return (int(minutes) * 60) + int(seconds) + (int(milliseconds)/1000)
 
-def main():
-    dataProcessing()
+# Helper functions to convert any team name to standard name (so as to exclude engine/sponsorship/rebrand changes as
+# being seperate new teams)
+def updateTeamNames(team):
+    try:
+        return teamDict[team]
+    except KeyError:
+        # If key error, that means input team is not in the dictionary and so is in standard form already
+        return team
 
+
+# Dictionary containing translation to standard team names
+teamDict = {
+    "AlphaTauri Honda RBPT": "Racing Bulls",
+    "Lotus Renault": "Alpine",
+    "Toro Rosso Ferrari": "Racing Bulls",
+    "Williams Toyota": "Williams",
+    "Williams Cosworth": "Williams",
+    "RBR Ferrari": "Red Bull",
+    "Lotus Mercedes": "Alpine",
+    "AlphaTauri Honda":	"Racing Bulls",
+    "Alpine Renault": "Alpine",
+    "McLaren Mercedes":	"McLaren",
+    "RBR Renault": "Red Bull",
+    "Red Bull Racing TAG Heuer": "Red Bull",
+    "Renault": "Alpine",
+    "Haas Ferrari": "Haas",
+    "Lotus Cosworth": "Alpine",
+    "Red Bull Racing RBPT": "Red Bull",
+    "Scuderia Toro Rosso Honda": "Racing Bulls",
+    "Kick Sauber Ferrari": "Sauber",
+    "McLaren Renault": "McLaren",
+    "Force India Mercedes": "Aston Martin",
+    "Williams Mercedes": "Williams",
+    "McLaren Honda": "McLaren",
+    "Red Bull Racing Honda": "Red Bull",
+    "Aston Martin Mercedes": "Aston Martin",
+    "Toro Rosso": "Racing Bulls",
+    "Alfa Romeo Ferrari": "Sauber",
+    "Aston Martin Aramco Mercedes": "Aston Martin",
+    "AlphaTauri RBPT": "Racing Bulls",
+    "Red Bull Racing Honda RBPT": "Red Bull",
+    "RB Honda RBPT": "Red Bull",
+    "Sauber BMW": "Sauber",
+    "STR Ferrari": "STR",
+    "Red Bull Racing Renault": "Red Bull",
+    "STR Renault": "STR",
+    "STR Cosworth":	"STR",
+    "Racing Point BWT Mercedes": "Aston Martin",
+    "Alfa Romeo Racing Ferrari": "Sauber",
+    "Red Bull Renault": "Red Bull",
+    "Williams Renault":	"Williams",
+    "Force India Ferrari": "Aston Martin",
+    "Sauber Ferrari": "Sauber"
+}
+
+def machineLearningTraining(df):
+    return
+
+def main():
+    machineLearningTraining(dataProcessing())
 
 main()
 
