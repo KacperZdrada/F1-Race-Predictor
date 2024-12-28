@@ -1,6 +1,7 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
 
 def dataProcessing():
     # Read both results files and transform into pandas dataframe
@@ -105,7 +106,7 @@ def dataProcessing():
     # Normalise data
     scaler = StandardScaler()
     mergedResults[["Quali Delta"]] = scaler.fit_transform(mergedResults[["Quali Delta"]])
-
+    print(mergedResults.head(50))
     # One-hot encode categorical data like driver names, team names, and race location
     mergedResults = pd.get_dummies(mergedResults, columns=["Driver", "Team", "Race"], drop_first=True)
 
@@ -186,44 +187,65 @@ teamDict = {
     "Sauber Ferrari": "Sauber"
 }
 
-def machineLearningTraining(df):
-    randomForest(df)
-    return
-
-# Function that trains a random forest regression model
-def randomForest(df):
-    # Split the dataset into training set (80%) and testing set (20%)
-    train = df[df["Year"] < 2021]
-    test = df[df["Year"] >= 2021]
-    inputColumns = []
-    # Iterate over all one-hot encoded columns and add them to the model input array
+# Helper function to find all input columns for model training (especially one-hot encoded ones)
+def findInputColumns(df):
+    inputColumns = ["Position Quali", "Last 5 Race", "Quali Delta", "Team Season DNF"]
     for column in df.columns:
         if column.startswith("Driver_") or column.startswith("Team_") or column.startswith("Race_"):
             inputColumns.append(column)
-    inputColumns = inputColumns + ["Position Quali", "Last 5 Race", "Quali Delta"]
+    return inputColumns
+
+# Helper function to find amount of correctly predicted wins for a regression model
+def regressionPrecision(testdf,predictions):
+    # Create new dataframe with actual result and predicted results
+    predicteddf = pd.DataFrame({"Actual": testdf["Position Race"], "Predicted": predictions, "Race": testdf["Race Number"]})
+    # Find number of races in the dataframe
+    numberOfRaces = predicteddf["Race"].max() - predicteddf["Race"].min() + 1
+    # Sort the entries by race and then by the predicted position of the regression model within that race
+    sorteddf = predicteddf.sort_values(by=["Race", "Predicted"], ascending=[True, True])
+    # Find the row for each race with the lowest predicted position (i.e. the race winner)
+    sorteddf["First"] = sorteddf.groupby("Race").cumcount() == 0
+    # Filter the rows to only where the prediction of the race winner was correct
+    correctdf = sorteddf[(sorteddf["First"]) & (sorteddf["Actual"] == 1)]
+    # Find the number of correct predictions (number of rows in correct dataframe)
+    correct = correctdf.shape[0]
+    return (correct/numberOfRaces)
+
+
+# Function that trains a random forest regression model
+def randomForest(train, test, inputColumns):
     # Train model
-    model = RandomForestRegressor(n_estimators=1000, min_samples_split=100, random_state=1)
+    model = RandomForestRegressor(n_estimators=1000, min_samples_split=100, random_state=1, n_jobs=-1)
     model.fit(train[inputColumns], train["Position Race"])
     # Make predictions on testing set
     predictions = model.predict(test[inputColumns])
-    # Create new dataframe with actual result and predicted results
-    predictdf = pd.DataFrame({"Actual": test["Position Race"], "Predicted": predictions, "Race": test["Race Number"]})
-    # Find variables used to find number of races
-    lowRace = test["Race Number"].min()
-    highRace = test["Race Number"].max()
-    # Sort the entries by race and then by the predicted position of the regression model within that race
-    sorteddf = predictdf.sort_values(by=['Race', 'Predicted'], ascending=[True, True])
-    # Find all entries where a driver was predicted by the model to be first
-    sorteddf["First"] = sorteddf.groupby("Race").cumcount() == 0
-    # Filter rows only where the prediction of the race winner was correct
-    correctdf = sorteddf[(sorteddf['First']) & (sorteddf['Actual'] == 1)]
-    # Count the number of rows where aa correct prediction was made
-    counter = correctdf.shape[0]
-    # Print the accuracy of predicted results
-    print(counter/(highRace-lowRace))
+    print(regressionPrecision(test, predictions))
+
+
+# Function that trains a linear regression model
+def linearRegression(train, test, inputColumns):
+    # Train model
+    model = LinearRegression(fit_intercept=True, n_jobs=-1)
+    model.fit(train[inputColumns], train["Position Race"])
+    # Make predictions on testing set
+    predictions = model.predict(test[inputColumns])
+    print(regressionPrecision(test, predictions))
+
+# Function that trains a logistical regression model
+def machineLearningTraining(df):
+    # Split the dataset into training set (80%) and testing set (20%)
+    train = df[df["Year"] < 2021]
+    test = df[df["Year"] >= 2021]
+    # Find all input columns for the models
+    inputColumns = findInputColumns(df)
+    randomForest(train, test, inputColumns)
+    linearRegression(train, test, inputColumns)
+    return
+
 
 def main():
-    machineLearningTraining(dataProcessing())
+    df = dataProcessing()
+    machineLearningTraining(df)
 
 main()
 
