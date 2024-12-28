@@ -1,5 +1,6 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
 
 def dataProcessing():
     # Read both results files and transform into pandas dataframe
@@ -186,7 +187,40 @@ teamDict = {
 }
 
 def machineLearningTraining(df):
+    randomForest(df)
     return
+
+# Function that trains a random forest regression model
+def randomForest(df):
+    # Split the dataset into training set (80%) and testing set (20%)
+    train = df[df["Year"] < 2021]
+    test = df[df["Year"] >= 2021]
+    inputColumns = []
+    # Iterate over all one-hot encoded columns and add them to the model input array
+    for column in df.columns:
+        if column.startswith("Driver_") or column.startswith("Team_") or column.startswith("Race_"):
+            inputColumns.append(column)
+    inputColumns = inputColumns + ["Position Quali", "Last 5 Race", "Quali Delta"]
+    # Train model
+    model = RandomForestRegressor(n_estimators=1000, min_samples_split=100, random_state=1)
+    model.fit(train[inputColumns], train["Position Race"])
+    # Make predictions on testing set
+    predictions = model.predict(test[inputColumns])
+    # Create new dataframe with actual result and predicted results
+    predictdf = pd.DataFrame({"Actual": test["Position Race"], "Predicted": predictions, "Race": test["Race Number"]})
+    # Find variables used to find number of races
+    lowRace = test["Race Number"].min()
+    highRace = test["Race Number"].max()
+    # Sort the entries by race and then by the predicted position of the regression model within that race
+    sorteddf = predictdf.sort_values(by=['Race', 'Predicted'], ascending=[True, True])
+    # Find all entries where a driver was predicted by the model to be first
+    sorteddf["First"] = sorteddf.groupby("Race").cumcount() == 0
+    # Filter rows only where the prediction of the race winner was correct
+    correctdf = sorteddf[(sorteddf['First']) & (sorteddf['Actual'] == 1)]
+    # Count the number of rows where aa correct prediction was made
+    counter = correctdf.shape[0]
+    # Print the accuracy of predicted results
+    print(counter/(highRace-lowRace))
 
 def main():
     machineLearningTraining(dataProcessing())
