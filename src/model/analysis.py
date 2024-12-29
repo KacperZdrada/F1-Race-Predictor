@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
 
 def dataProcessing():
     # Read both results files and transform into pandas dataframe
@@ -219,7 +219,7 @@ def randomForest(train, test, inputColumns):
     model.fit(train[inputColumns], train["Position Race"])
     # Make predictions on testing set
     predictions = model.predict(test[inputColumns])
-    print(regressionPrecision(test, predictions))
+    print("Random Forest:", regressionPrecision(test, predictions))
 
 
 # Function that trains a linear regression model
@@ -229,9 +229,26 @@ def linearRegression(train, test, inputColumns):
     model.fit(train[inputColumns], train["Position Race"])
     # Make predictions on testing set
     predictions = model.predict(test[inputColumns])
-    print(regressionPrecision(test, predictions))
+    print("Linear Regression:", regressionPrecision(test, predictions))
 
-# Function that trains a logistical regression model
+
+# Function that trains a logistic regression model
+def logisticRegression(train, test, inputColumns):
+    # Train model
+    model = LogisticRegression(penalty='l2',
+                               C=1,
+                               solver='saga',
+                               max_iter=10000,
+                               n_jobs=-1)
+    model.fit(train[inputColumns], train["Win"])
+    # Make predictions on testing set
+    predictions = model.predict_proba(test[inputColumns])
+    prob1 = []
+    for element in predictions:
+        prob1.append(element[0])
+    print("Logistic Regression:", regressionPrecision(test, prob1))
+
+
 def machineLearningTraining(df):
     # Split the dataset into training set (80%) and testing set (20%)
     train = df[df["Year"] < 2021]
@@ -240,6 +257,7 @@ def machineLearningTraining(df):
     inputColumns = findInputColumns(df)
     randomForest(train, test, inputColumns)
     linearRegression(train, test, inputColumns)
+    logisticRegression(train, test, inputColumns)
     return
 
 
